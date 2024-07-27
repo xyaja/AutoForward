@@ -16,7 +16,7 @@ from pyrogram.errors import InputUserDeactivated, FloodWait, UserIsBlocked
 
 
 
-@Client.on_message(filters.command(["broadcast", "b"]) & filters.user(Config.BOT.WNER_ID) & filters.reply)
+@Client.on_message(filters.command(["broadcast", "b"]) & filters.user(Config.BOT.OWNER_ID) & filters.reply)
 async def broadcast (bot, message):
     users = await db.get_all_users()
     b_msg = message.reply_to_message
