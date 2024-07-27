@@ -1,10 +1,3 @@
-import asyncio 
-import time, datetime 
-from database import db 
-from config import Config
-from pyrogram import Client, filters 
-from pyrogram.errors import InputUserDeactivated, FloodWait, UserIsBlocked
-
 # Jishu Developer 
 # Don't Remove Credit 🥺
 # Telegram Channel @Madflix_Bots
@@ -23,7 +16,7 @@ from pyrogram.errors import InputUserDeactivated, FloodWait, UserIsBlocked
 
 
 
-@Client.on_message(filters.command(["broadcast", "b"]) & filters.user(Config.OWNER_ID) & filters.reply)
+@Client.on_message(filters.command(["broadcast", "b"]) & filters.user(Config.BOT.WNER_ID) & filters.reply)
 async def broadcast (bot, message):
     users = await db.get_all_users()
     b_msg = message.reply_to_message
