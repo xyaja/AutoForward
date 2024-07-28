@@ -1,6 +1,5 @@
 pyrofork
 motor
-TgCrypto
 Dnspython
 telethon
 cryptg
