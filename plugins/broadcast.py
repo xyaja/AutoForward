@@ -13,65 +13,125 @@ from database import db
 from config import Config
 from pyrogram import Client, filters 
 from pyrogram.errors import InputUserDeactivated, FloodWait, UserIsBlocked
+from motor.motor_asyncio import AsyncIOMotorClient as MongoClient
 
-
-
-@Client.on_message(filters.command(["broadcast", "b"]) & filters.user(Config.BOT.OWNER_ID) & filters.reply)
-async def broadcast (bot, message):
-    users = await db.get_all_users()
-    b_msg = message.reply_to_message
-    sts = await message.reply_text(
-        text='Broadcasting Your Messages...'
+    @app.on_message(
+        filters.command("stats") & filters.user(BOT_OWNER_ID)
     )
-    start_time = time.time()
-    total_users, k = await db.total_users_bots_count()
-    done = 0
-    blocked = 0
-    deleted = 0
-    failed = 0 
-    success = 0
-    async for user in users:
-        pti, sh = await broadcast_messages(int(user['id']), b_msg, bot.log)
-        if pti:
-            success += 1
-            await asyncio.sleep(2)
-        elif pti == False:
-            if sh == "Blocked":
-                blocked+=1
-            elif sh == "Deleted":
-                deleted += 1
-            elif sh == "Error":
-                failed += 1
-        done += 1
-        if not done % 20:
-            await sts.edit(f"<b><u>Broadcast In Progress :</u></b>\n\nTotal Users {total_users}\nCompleted: {done} / {total_users}\nSuccess: {success}\nBlocked: {blocked}\nDeleted: {deleted}")    
-    time_taken = datetime.timedelta(seconds=int(time.time()-start_time))
-    await sts.edit(f"<b><u>Broadcast Completed :</u></b>\n\nCompleted in {time_taken} seconds.\n\nTotal Users {total_users}\nCompleted: {done} / {total_users}\nSuccess: {success}\nBlocked: {blocked}\nDeleted: {deleted}")
+    async def stats_func(_, message: Message):
+        if db is None:
+            return await message.reply_text(
+                "MONGO_DB_URI var not defined. Please define it first"
+            )
+        served_users = len(await mongo.get_served_users())
+        blocked = await mongo.get_banned_count()
+        text = f""" **ChatBot Stats:**
+        
+**Python Version :** {pyver.split()[0]}
+**Pyrogram Version :** {pyrover}
 
-async def broadcast_messages(user_id, message, log):
-    try:
-        await message.copy(chat_id=user_id)
-        return True, "Success"
-    except FloodWait as e:
-        await asyncio.sleep(e.x)
-        return await broadcast_messages(user_id, message, log)
-    except InputUserDeactivated:
-        await db.delete_user(int(user_id))
-        log.info(f"{user_id}-Removed from Database, since deleted account.")
-        return False, "Deleted"
-    except UserIsBlocked:
-        log.info(f"{user_id} -Blocked the bot.")
-        return False, "Blocked"
-    except Exception as e:
-        return False, "Error"
+**Served Users:** {served_users} 
+**Blocked Users:** {blocked}"""
+        await message.reply_text(text)
 
-    
+    @app.on_message(
+        filters.command("broadcast") & filters.user(BOT_OWNER_ID)
+    )
+    async def broadcast_func(_, message: Message):
+        if db is None:
+            return await message.reply_text(
+                "MONGO_DB_URI var not defined. Please define it first"
+            )
+        if message.reply_to_message:
+            x = message.reply_to_message.message_id
+            y = message.chat.id
+        else:
+            if len(message.command) < 2:
+                return await message.reply_text(
+                    "**Usage**:\n/broadcast [MESSAGE] or [Reply to a Message]"
+                )
+            query = message.text.split(None, 1)[1]
 
+        susr = 0
+        served_users = []
+        susers = await mongo.get_served_users()
+        for user in susers:
+            served_users.append(int(user["user_id"]))
+        for i in served_users:
+            try:
+                await app.forward_messages(
+                    i, y, x
+                ) if message.reply_to_message else await app.send_message(
+                    i, text=query
+                )
+                susr += 1
+            except FloodWait as e:
+                flood_time = int(e.x)
+                if flood_time > 200:
+                    continue
+                await asyncio.sleep(flood_time)
+            except Exception:
+                pass
+        try:
+            await message.reply_text(
+                f"**Broadcasted Message to {susr} Users.**"
+            )
+        except:
+            pass
 
-
-
-# Jishu Developer 
-# Don't Remove Credit 🥺
-# Telegram Channel @Madflix_Bots
-# Backup Channel @JishuBotz
-# Developer @JishuDeveloper
+    @app.on_message(filters.private & ~filters.edited)
+    async def incoming_private(_, message):
+        user_id = message.from_user.id
+        if await mongo.is_banned_user(user_id):
+            return
+        if user_id in SUDO_USERS:
+            if message.reply_to_message:
+                if (
+                    message.text == "/unblock"
+                    or message.text == "/block"
+                    or message.text == "/broadcast"
+                ):
+                    return
+                if not message.reply_to_message.forward_sender_name:
+                    return await message.reply_text(
+                        "Please reply to forwarded messages only."
+                    )
+                replied_id = message.reply_to_message_id
+                try:
+                    replied_user_id = save[replied_id]
+                except Exception as e:
+                    print(e)
+                    return await message.reply_text(
+                        "Failed to fetch user. You might've restarted bot or some error happened. Please check logs"
+                    )
+                try:
+                    return await app.copy_message(
+                        replied_user_id,
+                        message.chat.id,
+                        message.message_id,
+                    )
+                except Exception as e:
+                    print(e)
+                    return await message.reply_text(
+                        "Failed to send the message, User might have blocked the bot or something wrong happened. Please check logs"
+                    )
+        else:
+            if await mongo.is_group():
+                try:
+                    forwarded = await app.forward_messages(
+                        config.LOG_GROUP_ID,
+                        message.chat.id,
+                        message.message_id,
+                    )
+                    save[forwarded.message_id] = user_id
+                except:
+                    pass
+            else:
+                for user in SUDO_USERS:
+                    try:
+                        forwarded = await app.forward_messages(
+                            user, message.chat.id, message.message_id
+                        )
+                        save[forwarded.message_id] = user_id
+                    except:
+                        pass
