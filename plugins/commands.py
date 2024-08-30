@@ -6,8 +6,9 @@ from config import Config, temp
 from platform import python_version
 from translation import Translation
 from pyrogram import Client, filters, enums, __version__ as pyrogram_version
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaDocument
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+# Define buttons
 main_buttons = [[
         InlineKeyboardButton('Main Channel', url='https://t.me/dev_gagan')
         ],[
@@ -19,34 +20,35 @@ main_buttons = [[
         ],[
         InlineKeyboardButton('⚙️ sᴇᴛᴛɪɴɢs ⚙️', callback_data='settings#main')
         ]]
+
 #===================Start Function===================#
 
 @Client.on_message(filters.private & filters.command(['start']))
-async def start(client, message):
+async def start(client: Client, message: Message):
     user = message.from_user
     if not await db.is_user_exist(user.id):
-      await db.add_user(user.id, user.first_name)
-    reply_markup = InlineKeyboardMarkup(main_buttons)
+        await db.add_user(user.id, user.first_name)
     await client.send_message(
         chat_id=message.chat.id,
-        reply_markup=InlineKeyboardMarkup(main_buttons),
-        text=Translation.START_TXT.format(message.from_user.first_name))
+        text=Translation.START_TXT.format(user.first_name),
+        reply_markup=InlineKeyboardMarkup(main_buttons)
+    )
 
 #==================Restart Function==================#
 
 @Client.on_message(filters.private & filters.command(['restart']) & filters.user(Config.BOT_OWNER_ID))
-async def restart(client, message):
+async def restart(client: Client, message: Message):
     msg = await message.reply_text(
-        text="<i>Trying to restarting.....</i>"
+        text="<i>Trying to restart.....</i>"
     )
     await asyncio.sleep(5)
     await msg.edit("<i>Server restarted successfully ✅</i>")
     os.execl(sys.executable, sys.executable, *sys.argv)
-    
+
 #==================Callback Functions==================#
 
 @Client.on_callback_query(filters.regex(r'^help'))
-async def helpcb(bot, query):
+async def help_callback(client: Client, query: CallbackQuery):
     await query.message.edit_text(
         text=Translation.HELP_TXT,
         reply_markup=InlineKeyboardMarkup(
@@ -58,10 +60,11 @@ async def helpcb(bot, query):
             ],[
             InlineKeyboardButton('↩ ʙᴀᴄᴋ', callback_data='back')
             ]]
-        ))
+        )
+    )
 
 @Client.on_callback_query(filters.regex(r'^how_to_use'))
-async def how_to_use(bot, query):
+async def how_to_use_callback(client: Client, query: CallbackQuery):
     await query.message.edit_text(
         text=Translation.HOW_USE_TXT,
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('↩ Back', callback_data='help')]]),
@@ -69,28 +72,32 @@ async def how_to_use(bot, query):
     )
 
 @Client.on_callback_query(filters.regex(r'^back'))
-async def back(bot, query):
-    reply_markup = InlineKeyboardMarkup(main_buttons)
+async def back_callback(client: Client, query: CallbackQuery):
     await query.message.edit_text(
-       reply_markup=reply_markup,
-       text=Translation.START_TXT.format(
-                query.from_user.first_name))
+        text=Translation.START_TXT.format(query.from_user.first_name),
+        reply_markup=InlineKeyboardMarkup(main_buttons)
+    )
 
 @Client.on_callback_query(filters.regex(r'^about'))
-async def about(bot, query):
+async def about_callback(client: Client, query: CallbackQuery):
     await query.message.edit_text(
-        text=Translation.ABOUT_TXT.format(my_name='Public Forward',python_version=python_version(),pyrogram_version=pyrogram_version,mongodb_version=await mongodb_version()),
+        text=Translation.ABOUT_TXT.format(
+            my_name='Public Forward',
+            python_version=python_version(),
+            pyrogram_version=pyrogram_version,
+            mongodb_version=await mongodb_version()
+        ),
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('↩ Back', callback_data='back')]]),
         disable_web_page_preview=True,
         parse_mode=enums.ParseMode.HTML,
     )
 
 @Client.on_callback_query(filters.regex(r'^status'))
-async def status(bot, query):
+async def status_callback(client: Client, query: CallbackQuery):
     users_count, bots_count = await db.total_users_bots_count()
     total_channels = await db.total_channels()
     await query.message.edit_text(
-        text=Translation.STATUS_TXT.format(users_count, bots_count, temp.forwardings, total_channels, temp.BANNED_USERS ),
+        text=Translation.STATUS_TXT.format(users_count, bots_count, temp.forwardings, total_channels, temp.BANNED_USERS),
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('↩ Back', callback_data='help')]]),
         parse_mode=enums.ParseMode.HTML,
         disable_web_page_preview=True,
