@@ -1,24 +1,27 @@
-from bot import Bot
-import logging
 import asyncio
+from pyrogram import Client
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Ganti "my_bot" dengan nama atau ID sesi yang sesuai
+app = Client("my_bot")
 
 async def main():
-    app = Bot()
-
     try:
+        # Start the client
         await app.start()
-        logger.info(f"Bot @{app.username} is running...")
-        # Keep the bot running
-        await asyncio.Future()  # Run forever
-    except KeyboardInterrupt:
-        logger.info("Received KeyboardInterrupt. Stopping bot...")
+
+        # Implement your main logic here
+        print("Client started and running...")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
     finally:
-        await app.stop()
-        logger.info("Bot has been stopped.")
+        try:
+            # Stop the client
+            await app.stop()
+            print("Client stopped successfully.")
+        except ConnectionError:
+            print("Client is already terminated or stopped.")
 
 if __name__ == "__main__":
     asyncio.run(main())
